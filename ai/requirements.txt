@@ -1,0 +1,9 @@
+Flask # Atau FastAPI
+numpy
+pandas
+scipy
+opencv-python # Jika menggunakan pemrosesan gambar
+Pillow # Untuk manipulasi gambar
+pytesseract # Untuk OCR (membutuhkan Tesseract-OCR terinstal di sistem)
+pdf2image # Untuk mengonversi PDF ke gambar (membutuhkan poppler terinstal di sistem)
+# Tambahkan library AI/ML lainnya sesuai kebutuhan (misal: transformers, scikit-learn jika ada model ML)

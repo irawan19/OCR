@@ -1,0 +1,765 @@
+definitions:
+  models.Document:
+    properties:
+      created_at:
+        type: string
+      doc_type:
+        description: e.g., KTP, KK, Ijazah, Transkrip
+        type: string
+      extracted_data:
+        description: JSONB for storing OCR extracted data
+        type: string
+      filename:
+        type: string
+      id:
+        type: integer
+      is_processed:
+        type: boolean
+      is_valid:
+        description: Based on AI validation
+        type: boolean
+      mime_type:
+        type: string
+      minio_path:
+        description: Path in MinIO bucket
+        type: string
+      size:
+        type: integer
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/models.User'
+      user_id:
+        description: User who uploaded the document
+        type: integer
+      validation_notes:
+        description: Notes from AI validation
+        type: string
+    type: object
+  models.ScholarshipApplication:
+    properties:
+      admin_notes:
+        type: string
+      applicant_name:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      ijazah_document_id:
+        type: integer
+      ijazahDocument:
+        $ref: '#/definitions/models.Document'
+      ipk:
+        type: number
+      kk_document_id:
+        type: integer
+      kkdocument:
+        $ref: '#/definitions/models.Document'
+      ktp_document_id:
+        type: integer
+      ktpdocument:
+        $ref: '#/definitions/models.Document'
+      status:
+        description: e.g., pending, reviewed, accepted, rejected
+        type: string
+      transkrip_document_id:
+        type: integer
+      transkripDocument:
+        $ref: '#/definitions/models.Document'
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/models.User'
+      user_id:
+        type: integer
+    type: object
+  models.User:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      role:
+        description: e.g., admin, user
+        type: string
+      updated_at:
+        type: string
+      username:
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /admin/scholarships/{id}/status:
+    put:
+      consumes:
+      - application/json
+      description: Allows an admin to update the status of a scholarship application.
+      parameters:
+      - description: Application ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: New status (e.g., reviewed, accepted, rejected) and admin notes
+        in: body
+        name: status
+        required: true
+        schema:
+          properties:
+            admin_notes:
+              type: string
+            status:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ScholarshipApplication'
+        "400":
+          description: 'error: Invalid input'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: 'error: Unauthorized'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: 'error: Forbidden'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: 'error: Application not found'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: Failed to update status'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Update scholarship application status
+      tags:
+      - Scholarship Applications
+  /admin/scholarships/{id}/validate:
+    post:
+      description: Compares applicant's input data with data extracted from uploaded
+        documents via AI.
+      parameters:
+      - description: Application ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'message: AI validation completed, is_valid: true/false, notes:
+            validation_notes'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 'error: Invalid ID'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: 'error: Unauthorized'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: 'error: Forbidden'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: 'error: Application or documents not found'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: Failed to perform AI validation'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Validate scholarship application data using AI
+      tags:
+      - Scholarship Applications
+  /admin/users:
+    get:
+      description: Retrieve a list of all users in the system (Admin only)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.User'
+            type: array
+        "401":
+          description: 'error: Unauthorized'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: 'error: Forbidden'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: Failed to retrieve users'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Get all users
+      tags:
+      - Users
+  /documents/{id}/process:
+    post:
+      description: Allows triggering AI processing for an already uploaded document.
+      parameters:
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'message: AI processing triggered successfully'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 'error: Invalid ID'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: 'error: Unauthorized'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: 'error: Access denied'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: 'error: Document not found'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: Failed to trigger AI processing'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Manually trigger AI processing for a document
+      tags:
+      - Documents
+  /documents/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Uploads a file (PDF or image) to MinIO and records its metadata
+        in the database. Triggers AI processing.
+      parameters:
+      - description: Document file to upload
+        in: formData
+        name: document
+        required: true
+        type: file
+      - description: Type of document (e.g., KTP, KK, Ijazah, Transkrip)
+        in: formData
+        name: doc_type
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Document'
+        "400":
+          description: 'error: Invalid input'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: 'error: Unauthorized'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: Failed to upload document'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Upload a new document
+      tags:
+      - Documents
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user and return a JWT token
+      parameters:
+      - description: User login credentials
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/models.User'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'token: JWT_TOKEN'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 'error: Invalid input'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: 'error: Invalid credentials'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: Failed to generate token'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Login a user
+      tags:
+      - Auth
+  /register:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user with username and password
+      parameters:
+      - description: User registration data
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/models.User'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: 'message: User registered successfully'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 'error: Invalid input'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: 'error: Username already exists'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: Failed to register user'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Register a new user
+      tags:
+      - Auth
+  /scholarships:
+    get:
+      description: Retrieve all scholarship applications (admin can see all, users
+        see their own).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.ScholarshipApplication'
+            type: array
+        "401":
+          description: 'error: Unauthorized'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: Failed to retrieve applications'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Get all scholarship applications
+      tags:
+      - Scholarship Applications
+    post:
+      consumes:
+      - application/json
+      description: Allows a user to submit a new scholarship application with references
+        to uploaded documents.
+      parameters:
+      - description: Scholarship application data
+        in: body
+        name: application
+        required: true
+        schema:
+          $ref: '#/definitions/models.ScholarshipApplication'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.ScholarshipApplication'
+        "400":
+          description: 'error: Invalid input'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: 'error: Unauthorized'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: 'error: Referenced document not found'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: Failed to create application'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new scholarship application
+      tags:
+      - Scholarship Applications
+  /scholarships/{id}:
+    get:
+      description: Retrieve a specific scholarship application by its ID.
+      parameters:
+      - description: Application ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ScholarshipApplication'
+        "400":
+          description: 'error: Invalid ID'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: 'error: Unauthorized'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: 'error: Access denied'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: 'error: Application not found'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Get scholarship application by ID
+      tags:
+      - Scholarship Applications
+    put:
+      consumes:
+      - application/json
+      description: Allows a user to update their own scholarship application.
+      parameters:
+      - description: Application ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Updated scholarship application data
+        in: body
+        name: application
+        required: true
+        schema:
+          $ref: '#/definitions/models.ScholarshipApplication'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ScholarshipApplication'
+        "400":
+          description: 'error: Invalid input'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: 'error: Unauthorized'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: 'error: Access denied'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: 'error: Application not found'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: Failed to update application'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Update an existing scholarship application
+      tags:
+      - Scholarship Applications
+  /users/{id}:
+    delete:
+      description: Delete a user by ID. Users can delete their own account, admin
+        can delete any user.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: 'error: Invalid ID'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: 'error: Unauthorized'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: 'error: Access denied'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: 'error: User not found'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: Failed to delete user'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a user
+      tags:
+      - Users
+    get:
+      description: Retrieve user details by ID
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: 'error: Invalid ID'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: 'error: Unauthorized'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: 'error: Access denied'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: 'error: User not found'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Get user by ID
+      tags:
+      - Users
+    put:
+      consumes:
+      - application/json
+      description: Update details of an existing user. Users can update their own
+        profile, admin can update any user.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Updated user details (username, role - admin only for role)
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/models.User'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: 'error: Invalid input'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: 'error: Unauthorized'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: 'error: Access denied'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: 'error: User not found'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'error: Failed to update user'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Update user details
+      tags:
+      - Users
+swagger: "2.0"

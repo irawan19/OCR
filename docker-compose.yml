@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  # --- PostgreSQL Database Service ---
+  postgres_db:
+    image: postgres:15-alpine # Menggunakan image PostgreSQL versi 15 yang ringan
+    container_name: ocr_postgres_db
+    restart: always # Otomatis restart jika container berhenti
+    environment:
+      POSTGRES_USER: myuser # Sesuai dengan DATABASE_URL di .env backend Go
+      POSTGRES_PASSWORD: mypassword # Sesuai dengan DATABASE_URL di .env backend Go
+      POSTGRES_DB: mydatabase # Sesuai dengan DATABASE_URL di .env backend Go
+    volumes:
+      - ocr_db_data:/var/lib/postgresql/data # Volume untuk menyimpan data persisten
+    ports:
+      - "5432:5432" # Mem-publish port database ke host Anda
+    networks:
+      - ocr_network # Semua service akan berada di network ini
+
+  # --- MinIO Object Storage Service ---
+  minio:
+    image: minio/minio:latest # Menggunakan image MinIO terbaru
+    container_name: ocr_minio
+    restart: always
+    ports:
+      - "9000:9000" # Port API MinIO
+      - "9001:9001" # Port UI Console MinIO
+    environment:
+      MINIO_ROOT_USER: nmbcii2mSebYQdUzjoOr # Sesuai dengan MINIO_ACCESS_KEY_ID di .env backend Go
+      MINIO_ROOT_PASSWORD: y8FMOgt7iulbsSJlRYXJARNg0f7kyNm4IXtGNyWF # Sesuai dengan MINIO_SECRET_ACCESS_KEY di .env backend Go
+    volumes:
+      - ocr_minio_data:/data # Volume untuk menyimpan data MinIO
+    command: server /data --console-address ":9001" # Perintah untuk menjalankan MinIO dengan konsol
+    networks:
+      - ocr_network
+
+  # --- GoLang Backend Service ---
+  backend:
+    build:
+      context: ./backend # Lokasi Dockerfile Go Backend
+      dockerfile: Dockerfile
+    container_name: ocr_backend
+    restart: always
+    env_file:
+      - ./backend/.env # Mengambil variabel lingkungan dari file .env di direktori backend
+    ports:
+      - "8080:8080" # Mem-publish port aplikasi Go ke host Anda
+    depends_on:
+      - postgres_db # Backend bergantung pada database
+      - minio # Backend bergantung pada MinIO
+      - ai_service # Backend bergantung pada AI Service
+    networks:
+      - ocr_network
+
+  # --- Python AI Service ---
+  ai_service:
+    build:
+      context: ./ai # Lokasi Dockerfile Python AI
+      dockerfile: Dockerfile
+    container_name: ocr_ai_service
+    restart: always
+    env_file:
+      # Jika AI service membutuhkan variabel lingkungan dari .env nya sendiri, tambahkan di sini
+      # - ./ai/.env
+      - ./backend/.env # Sementara pakai .env backend jika AI juga perlu (misal: untuk secret key lain)
+    ports:
+      - "5000:5000" # Mem-publish port aplikasi AI Python ke host Anda
+    networks:
+      - ocr_network# --- Next.js Frontend Service ---
+  frontend:
+    build:
+      context: ./frontend # Lokasi Dockerfile Next.js Frontend
+      dockerfile: Dockerfile
+    container_name: ocr_frontend
+    restart: always
+    environment:
+      # Langsung define di sini agar lebih jelas, atau bisa pakai env_file
+      NEXT_PUBLIC_API_BASE_URL: http://backend:8080/api/v1 # Mengarah ke service backend
+    ports:
+      - "3000:3000" # Mem-publish port Next.js ke host Anda
+    depends_on:
+      - backend # Frontend bergantung pada backend
+    networks:
+      - ocr_network
+
+volumes:
+  ocr_db_data:
+  ocr_minio_data:
+
+networks:
+  ocr_network:
+    driver: bridge
